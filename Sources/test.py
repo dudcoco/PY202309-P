@@ -1,5 +1,6 @@
 import pandas as pd
 import random
+from geopy.distance import geodesic
 
 # csv파일 읽는 함수
 def read_file(filename):
@@ -30,19 +31,31 @@ def CourseRecommend(region):
     
     for idx, file in enumerate(files):
         df = read_file(file)
-        if 'stores' in df.columns:
-            place_list = df['stores'].tolist()  # 장소명 리스트
-            url_list = df['place_url'].tolist()  # 장소 url 가져와서 리스트에 저장
+        if 'stores' in df.columns and 'x' in df.columns and 'y' in df.columns:
+            place_list = df['stores'].tolist()
+            url_list = df['place_url'].tolist()
+            coordinates = list(zip(df['y'], df['x']))  # 순서를 바꿔서 가져오기
 
-            # 파일순으로 하나씩 선택
             selected_indices = random.sample(range(len(place_list)), 2)
             selected_places = [place_list[i] for i in selected_indices]
             selected_urls = [url_list[i] if 'place_url' in df.columns else "url 없음" for i in selected_indices]
+            selected_coordinates = [coordinates[i] for i in selected_indices]
 
-            # 장소와 url을 저장
-            for place, url in zip(selected_places, selected_urls):
-                category = "관광지" if idx == 0 else ("카페 및 기념품" if idx == 1 else "음식점")
-                courses[category].append((place, url))
+            # 기준 장소 선택 (맨 첫번째로 출력될 장소)
+            base_place, base_url, base_coord = selected_places[0], selected_urls[0], selected_coordinates[0]
+
+            # 거리 계산하여 정렬
+            distances = [geodesic(base_coord, coord).km for coord in selected_coordinates]
+            sorted_indices = sorted(range(len(distances)), key=lambda k: distances[k])
+
+            # 카테고리 먼저 선언
+            category = "관광지" if idx == 0 else ("카페 및 기념품" if idx == 1 else "음식점")
+
+            # 장소와 url을 저장 (가까운 순으로)
+            for i in sorted_indices:
+                place, url, coord = selected_places[i], selected_urls[i], selected_coordinates[i]
+                courses[category].append((place, url, coord))
+
 
     print("================ 여행 코스 추천 ================")
     print(f"선택하신 {region}구역의 여행 코스를 랜덤으로 추천해 드립니다.")
@@ -51,7 +64,7 @@ def CourseRecommend(region):
     # 징소를 랜덤으로 추천해주고 장소의 url도 함께 출력함
     for i in range(2):  # 2번 출력
         for category in ["관광지", "카페 및 기념품", "음식점"]:
-            place, url = courses[category][i]
+            place, url, coord = courses[category][i]
             print(f"- {category} : {place} ({url})")
 
 
